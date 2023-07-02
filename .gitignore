@@ -1,3 +1,8 @@
 __pycache__
 ros2_django.egg-info/
 db.sqlite3
+
+example_pkg/build/
+example_pkg/install/
+example_pkg/log/
+example_pkg/generated_interfaces/
