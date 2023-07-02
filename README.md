@@ -47,7 +47,7 @@ and connect to http://localhost:8000 to access admin interface
 
 ### Package creation
 
-*`example_pkg` folder contains a ready-to-use package using `ros2-django`. These instructions are for people who wants to do it manually*
+*`example_pkg` folder contains a ready-to-use package using `ros2-django`. These instructions are for people who want to do it manually*
 
  - Create a ROS2 package with a `CMakeLists.txt` (*not* a Python package)
    - `ros2 pkg create --build-type ament_cmake example_pkg`
@@ -65,10 +65,10 @@ and connect to http://localhost:8000 to access admin interface
 
 From now, you can edit your application `models.py` and create your model objects. 
 
-- All the models you want to export to ROS should inherit from `ros2_django.models.RosModel`.
+- All the models you want to export to ROS should inherit from `ros2_django.models.RosModel`
 - All the fields you want to export to ROS should be from module `ros2_django.fields` (for example `ros2_django.fields.RosCharField`)
 - A specific `ros2_django.fields.RosMsgField` allows you to store/retrieve directly a ROS message by specifying its type
-- Custom field can be created, they should inherit from both `ros2_django.fields.RosFieldMixin` and correspondant Django field
+- Custom fields can be created, they should inherit from both `ros2_django.fields.RosFieldMixin` and correspondant Django field
 
 Consider the following example of `models.py`
 ```python
@@ -97,7 +97,7 @@ class PoseOnMap(RosModel):
         on_delete=models.CASCADE,
     )
 ```
-In this example, `Map` and `PoseOnMap` messages will be created, will all the fields. And the `pose` field of `PoseOnMap` will be a standard `geometry_msgs` Pose.
+In this example, `Map` and `PoseOnMap` messages will be created, with all the fields. And the `pose` field of `PoseOnMap` will be a standard `geometry_msgs/Pose`.
 
 
 ### Generating interfaces
@@ -106,7 +106,7 @@ In this example, `Map` and `PoseOnMap` messages will be created, will all the fi
 
 Once `models.py` is written, you can create your database with standard `./manage.py makemigrations` and `./manage.py migrate`.
 
-You now also can run `./manage.py gen_ros_msgs example_app out/` that will genreate all messages and services definition for ROS in directory out.
+You now also can run `./manage.py gen_ros_msgs example_app out/` that will generate all messages and services definition for ROS in directory `out/`.
 
 For each `RosModel` named `Foo`, it will generate:
  - `Foo.msg` with all its fields, including reverse relations
