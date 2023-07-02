@@ -156,10 +156,9 @@ class RosModel(models.Model):
         return self
 
     def to_ros(self, raw, thin=False):
-        """Convert model instance to a ROS message
-        (need `data_manager` import from rosidl_generate_interfaces)"""
-        msgs = importlib.import_module(f"{settings.ROS_INTERFACES_MODULE_NAME}.msg")
+        """Convert model instance to a ROS message"""
 
+        msgs = importlib.import_module(f"{settings.ROS_INTERFACES_MODULE_NAME}.msg")
         ros_msg = getattr(msgs, self.ros_msgtype if not raw else self.ros_rawmsgtype)()
 
         for _field in self.msg_fields(raw, thin):

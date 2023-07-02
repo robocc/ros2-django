@@ -13,7 +13,7 @@ from .models import RosModel
 
 
 class ROS2DjangoNode(Node):
-    def __init__(self, node_name="ros2_django"):
+    def __init__(self, django_app, node_name="ros2_django"):
         super().__init__(
             node_name=node_name,
             parameter_overrides=[],
@@ -24,7 +24,7 @@ class ROS2DjangoNode(Node):
 
         pattern = re.compile(r"(?<!^)(?=[A-Z])")
         c = 0
-        for model in apps.get_app_config("app").get_models():
+        for model in apps.get_app_config(django_app).get_models():
             if not issubclass(model, RosModel):
                 continue
 
@@ -32,7 +32,8 @@ class ROS2DjangoNode(Node):
                 srv_itf = getattr(itf_srv, srv.name)
                 self.create_service(
                     srv_itf,
-                    "/data_manager/" + pattern.sub("_", srv.name).lower(),
+                    f"/{settings.ROS_INTERFACES_MODULE_NAME}/"
+                    + pattern.sub("_", srv.name).lower(),
                     self.exception_wrapper(srv.cb),
                 )
                 c += 1
