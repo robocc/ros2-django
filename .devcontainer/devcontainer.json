@@ -1,0 +1,36 @@
+{
+    "name": "ROS",
+    "image": "ros:iron",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": "true",
+            "username": "vscode",
+            "userUid": "1000",
+            "userGid": "1000",
+            "upgradePackages": "false"
+        }
+    },
+    "runArgs": [
+        "--net",
+        "host",
+        "-v",
+        "/tmp/.X11-unix:/tmp/.X11-unix",
+        "--privileged",
+        "-v",
+        "/dev:/dev"
+    ],
+    "containerEnv": {
+        "WORKSPACE_PATH": "${containerWorkspaceFolder}"
+    },
+    "remoteUser": "vscode",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.black-formatter",
+                "bierner.markdown-mermaid",
+                "ms-python.python",
+                "twxs.cmake"
+            ]
+        }
+    }
+}
