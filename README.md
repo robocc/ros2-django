@@ -24,9 +24,9 @@ Next, create a ROS2 package following the example in `example_pkg/`
 
 ## Usage
 
-### TL;DR
+### Package creation using boilerplate
 
-The quickest way is to use `example_pkg`. It contains a basic django app with 2 models
+The quickest way is to copy/use `example_pkg` in your workspace. It contains a basic django app with 2 ros models and ros2-django configured.
 
 ```sh
 cd example_pkg
@@ -44,22 +44,6 @@ You can also run
 ./manage.py runserver
 ```
 and connect to http://localhost:8000 to access admin interface
-
-### Package creation
-
-*`example_pkg` folder contains a ready-to-use package using `ros2-django`. These instructions are for people who want to do it manually*
-
- - Create a ROS2 package with a `CMakeLists.txt` (*not* a Python package)
-   - `ros2 pkg create --build-type ament_cmake example_pkg`
- - Create a standard Django project and app in your package
-   - `django-admin startproject example_django_project .`
-   - `./manage.py startapp example_app`
- - In `example_django_project/settings.py`
-   - Add `ros2_django` in `INSTALLED_APPS`
-   - Set `ROS_INTERFACES_MODULE_NAME` to ROS package name (`example_pkg` in this case)
- - Setup routes/admin stuff for Django if you want (cf. django documentation)
- - Edit your `CMakeLists.txt` to generate interfaces and install python packages (cf. example)
- - Create a node starter python file that will spin `ros2_django.ros_node.ROS2DjangoNode` (cf. example)
 
 ### models.py
 
@@ -118,6 +102,66 @@ For each `RosModel` named `Foo`, it will generate:
 
 Theses services will be implemented and served via `ros2_django.ros_node.ROS2DjangoNode`
 
+Example interfaces for previous model example:
+
+`Map.msg`:
+
+```
+PoseOnMap[] poseonmap
+int64 id
+string name
+string description
+uint8[] webp
+```
+
+`MapRaw.msg`:
+
+```
+int64 id
+string name
+string description
+uint8[] webp
+```
+
+`PoseOnMap.msg`:
+
+```
+int64 id 
+string name 
+geometry_msgs/Pose pose 
+int64 id_map 
+```
+
+`GetMap.srv`:
+
+```
+int64 id
+---
+bool success
+string message
+Map map
+```
+
+`SetMapRaw.srv`:
+
+```
+MapRaw map
+---
+bool success
+string message
+int64 id
+```
+
+`ListMap.srv`:
+
+```
+---
+bool success
+string message
+Map[] maps
+```
+
+
 ### Custom interfaces behaviour
 
 In order to customize interface services, one can declare a `RosMeta` class inside model.
@@ -126,14 +170,22 @@ Current accepted attributes are:
 
  - `ros_search`: list of fields (or fields tuple for and search) that we can search upon for `Get` and `Set` services.
    - Following example will generate a `GetFooByName` and `SetFooByName` service
- ```py
- class Foo(RosModel):
-    id = ros2_django.fields.RosBigAutoField(primary_key=True)
-    name = ros2_django.fields.RosCharField(max_length=128)
-    
-    class RosMeta:
-        ros_search = ['name']
-```
+    ```py
+     class Foo(RosModel):
+        id = ros2_django.fields.RosBigAutoField(primary_key=True)
+        name = ros2_django.fields.RosCharField(max_length=128)
+        
+        class RosMeta:
+            ros_search = ['name']
+    ```
+    Generated `GetFooByName.srv`
+    ```
+    string name
+    ---
+    bool success
+    string message
+    Foo  foo
+    ```
  - `ros_filter`: list of fields to filter upon for `List` services
     - Following example will generate a `ListBarByFoo` to list all `Bar` that depends on a specific `Foo`
     ```py
@@ -147,5 +199,31 @@ Current accepted attributes are:
         class RosMeta:
             ros_filter = ['foo']
     ```
+    Generated `ListBarByFoo.srv`
+    ```
+    int64 id_foo
+    ---
+    bool success
+    string message
+    Bar[] bars
+    ```
  - `ros_ignore_fields`: list of fields not included in the final message
- - `ros_thin_fields`: if present, will restrict which fields will be filled in `List` services to gain bandwith
+ - `ros_thin_fields`: if present, will restrict which fields will be filled in `List` services to gain bandwidth
+
+# Advanced
+
+### Package creation
+
+*`example_pkg` folder contains a ready-to-use package using `ros2-django`. These instructions are for people who want to do it manually*
+
+ - Create a ROS2 package with a `CMakeLists.txt` (*not* a Python package)
+   - `ros2 pkg create --build-type ament_cmake example_pkg`
+ - Create a standard Django project and app in your package
+   - `django-admin startproject example_django_project .`
+   - `./manage.py startapp example_app`
+ - In `example_django_project/settings.py`
+   - Add `ros2_django` in `INSTALLED_APPS`
+   - Set `ROS_INTERFACES_MODULE_NAME` to ROS package name (`example_pkg` in this case)
+ - Setup routes/admin stuff for Django if you want (cf. django documentation)
+ - Edit your `CMakeLists.txt` to generate interfaces and install python packages (cf. example)
+ - Create a node starter python file that will spin `ros2_django.ros_node.ROS2DjangoNode` (cf. example)
