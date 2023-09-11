@@ -163,7 +163,7 @@ class RosModel(models.Model):
 
         for _field in self.msg_fields(raw, thin):
             field = _field["field"]
-            if isinstance(field, RosFieldMixin) and isinstance(field, models.Field):
+            if isinstance(field, RosFieldMixin):
                 if isinstance(field, models.ForeignKey):
                     value = getattr(self, field.name).id
                 else:
@@ -171,7 +171,7 @@ class RosModel(models.Model):
                         if isinstance(field, RosManyToOneRel):
                             value = field.py2ros(getattr(self, field.name), thin=thin)
                         else:
-                            value = field.py2ros(getattr(self, field.name))
+                            value = field.py2ros(getattr(self, field.name))  # type: ignore
                     except ObjectDoesNotExist:
                         value = None
                         if field.ros_type:

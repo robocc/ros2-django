@@ -194,6 +194,10 @@ class RosForeignKey(RosFieldMixin, models.ForeignKey):
     ros_type = "int64"
     rel_class = RosManyToOneRel
 
+    def __init__(self, *args, **kwargs):
+        kwargs['related_name'] = "%(class)ss"
+        super().__init__(*args, **kwargs)
+
     @property
     def ros_name(self):
         return "id_" + self.name

@@ -107,7 +107,7 @@ Example interfaces for previous model example:
 `Map.msg`:
 
 ```
-PoseOnMap[] poseonmap
+PoseOnMap[] poseonmaps
 int64 id
 string name
 string description

@@ -14,7 +14,7 @@ class Map(RosModel):
         return f"[{self.id}] {self.name}"
 
     class RosMeta:
-        ros_thin_fields = ["id", "name", "description"]
+        ros_thin_fields = ["id", "name", "description", "poseonmaps"]
 
 
 class PoseOnMap(RosModel):
