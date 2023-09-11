@@ -14,6 +14,8 @@ class ImageFileInput(forms.ClearableFileInput):
 
     def format_value(self, value):
         if self.is_initial(value):
+            if isinstance(value, str):
+                return value
             return base64.b64encode(value).decode()
 
     def value_from_datadict(self, data, files, name):

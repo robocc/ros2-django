@@ -153,6 +153,8 @@ class RosModel(models.Model):
                             to_set.append(m.from_ros(child, raw, parent=self))
 
                     getattr(self, field.name).set(to_set)
+            if hasattr(self, "check_related"):
+                self.check_related()
         return self
 
     def to_ros(self, raw, thin=False):
@@ -165,7 +167,10 @@ class RosModel(models.Model):
             field = _field["field"]
             if isinstance(field, RosFieldMixin):
                 if isinstance(field, models.ForeignKey):
-                    value = getattr(self, field.name).id
+                    if getattr(self, field.name) is None:
+                        value = -1
+                    else:
+                        value = getattr(self, field.name).id
                 else:
                     try:
                         if isinstance(field, RosManyToOneRel):

@@ -192,6 +192,7 @@ class RosManyToOneRel(RosFieldMixin, models.ManyToOneRel):
 
 class RosForeignKey(RosFieldMixin, models.ForeignKey):
     ros_type = "int64"
+    ros_default = -1
     rel_class = RosManyToOneRel
 
     def __init__(self, *args, **kwargs):
@@ -219,6 +220,7 @@ class RosOneToOneRel(RosFieldMixin, models.OneToOneRel):
 
 class RosOneToOneField(RosFieldMixin, models.OneToOneField):
     ros_type = "int64"
+    ros_default = -1
     rel_class = RosOneToOneRel
 
     @property
