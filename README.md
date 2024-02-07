@@ -17,7 +17,7 @@ power of django framework that includes schema migration, admin interface, field
 For now, install it directly from GitHub
 
 ```
-pip install https://github.com/robocc/ros2-django.git
+pip install git+https://github.com/robocc/ros2-django.git
 ```
 
 Next, create a ROS2 package following the example in `example_pkg/`
@@ -31,6 +31,7 @@ The quickest way is to copy/use `example_pkg` in your workspace. It contains a b
 ```sh
 cd example_pkg
 colcon build
+source install/local_setup.bash # re-source ros workspace
 
 ./manage.py migrate  # create database
 ./manage.py createsuperuser # create admin user
