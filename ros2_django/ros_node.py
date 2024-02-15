@@ -13,7 +13,7 @@ from .models import RosModel
 
 
 class ROS2DjangoNode(Node):
-    def __init__(self, django_app, node_name="ros2_django"):
+    def __init__(self, django_app, node_name="ros2_django", overrides=[]):
         super().__init__(
             node_name=node_name,
             parameter_overrides=[],
@@ -29,11 +29,16 @@ class ROS2DjangoNode(Node):
                 continue
 
             for srv in model.services():
+                srv_path = (
+                    f"/{settings.ROS_INTERFACES_MODULE_NAME}/"
+                    + pattern.sub("_", srv.name).lower()
+                )
+                if srv_path in overrides:
+                    continue
                 srv_itf = getattr(itf_srv, srv.name)
                 self.create_service(
                     srv_itf,
-                    f"/{settings.ROS_INTERFACES_MODULE_NAME}/"
-                    + pattern.sub("_", srv.name).lower(),
+                    srv_path,
                     self.exception_wrapper(srv.cb),
                 )
                 c += 1
