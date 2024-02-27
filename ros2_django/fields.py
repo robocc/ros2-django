@@ -157,6 +157,8 @@ class RosMsgField(RosFieldMixin, models.Field):
     # ROS/Python conversion, value is from db (bytes)
 
     def py2ros(self, value):
+        if value is None:
+            return self.ros_msg()
         return deserialize_message(value, self.ros_msg)
 
     def ros2py(self, value):
