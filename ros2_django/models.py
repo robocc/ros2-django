@@ -7,8 +7,9 @@ from django.conf import settings
 
 from django.db import models, transaction
 
-from .services import RosGetSrv, RosSetSrv, RosDeleteSrv, RosListSrv, RosSrv
+from .services import RosGetSrv, RosSetSrv, RosDeleteSrv, RosListSrv
 from .fields import RosFieldMixin, RosManyToOneRel, RosForeignKey, RosOneToOneField
+from .types import Ros2SrvDef, Ros2MsgFieldDef
 
 logger = logging.getLogger()
 
@@ -46,7 +47,7 @@ class RosModel(models.Model):
         return cls.__name__.lower() + "s"
 
     @classmethod
-    def services(cls) -> list[RosSrv]:
+    def services(cls) -> list[Ros2SrvDef]:
         """Create all services definitions for this model"""
 
         services = getattr(cls, "_services", None)
@@ -80,10 +81,10 @@ class RosModel(models.Model):
         return cls._services
 
     @classmethod
-    def msg_fields(cls, raw, thin=False):
+    def msg_fields(cls, raw, thin=False) -> list[Ros2MsgFieldDef]:
         """List of fields defined in the ros msg file"""
 
-        fields = []
+        fields: list[Ros2MsgFieldDef] = []
         ros_meta = getattr(cls, "RosMeta", None)
 
         for field in cls._meta.get_fields():
@@ -103,7 +104,11 @@ class RosModel(models.Model):
             ):
                 continue
             elif isinstance(field, RosFieldMixin):
-                f = {"name": field.ros_name, "type": field.ros_type, "field": field}
+                f: Ros2MsgFieldDef = {
+                    "name": field.ros_name,
+                    "type": field.ros_type,
+                    "field": field,  # type: ignore (no intersect type in python :()
+                }
                 if field.ros_default is not None:
                     f["default"] = field.ros_default
                 fields.append(f)
@@ -150,24 +155,33 @@ class RosModel(models.Model):
                     getattr(self, field.name).all().delete()
 
                     to_set = []
-                    for child in getattr(ros_msg, field.ros_name):  # type: ignore
-                        m = field.related_model()
-                        if isinstance(m, RosModel):
-                            to_set.append(m.from_ros(child, raw, parent=self))
+                    for child in getattr(ros_msg, field.ros_name):
+                        if field.related_model:
+                            m = field.related_model()
+                            if isinstance(m, RosModel):
+                                to_set.append(m.from_ros(child, raw, parent=self))
 
                     getattr(self, field.name).set(to_set)
             if hasattr(self, "check_related"):
                 getattr(self, "check_related")()
         return self
 
-    def to_ros(self, raw, thin=False):
+    def to_ros(self, raw: bool, thin=False, fields: list[str] = []):
         """Convert model instance to a ROS message"""
 
         msgs = importlib.import_module(f"{settings.ROS_INTERFACES_MODULE_NAME}.msg")
         ros_msg = getattr(msgs, self.ros_msgtype if not raw else self.ros_rawmsgtype)()
 
-        for _field in self.msg_fields(raw, thin):
-            field = _field["field"]
+        if fields:
+            _fields = [self._meta.get_field(_field) for _field in fields]
+        else:
+            _fields = [
+                _field["field"]
+                for _field in self.msg_fields(raw, thin)
+                if "field" in _field
+            ]
+
+        for field in _fields:
             if isinstance(field, RosFieldMixin):
                 if isinstance(field, models.ForeignKey):
                     if getattr(self, field.name) is None:
