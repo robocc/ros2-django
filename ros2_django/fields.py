@@ -6,7 +6,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 import jsonschema
 from jsonschema.exceptions import ValidationError as JsonValidationError
-from rclpy.serialization import serialize_message, deserialize_message
+from rclpy.serialization import serialize_message, deserialize_message  # type:ignore
 
 from .utils import ros2json, json2ros
 
@@ -18,14 +18,14 @@ from .utils import ros2json, json2ros
 class RosFieldMixin(object):
     """Mixin for all fields inside model with RosModelMixin"""
 
-    ros_type = None
+    ros_type: str = "error"
     ros_default = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     @property
-    def ros_name(self):
+    def ros_name(self) -> str:
         return self.name  # type: ignore
 
     def py2ros(self, value):
@@ -198,7 +198,7 @@ class RosForeignKey(RosFieldMixin, models.ForeignKey):
     rel_class = RosManyToOneRel
 
     def __init__(self, *args, **kwargs):
-        kwargs['related_name'] = "%(class)ss"
+        kwargs["related_name"] = "%(class)ss"
         super().__init__(*args, **kwargs)
 
     @property

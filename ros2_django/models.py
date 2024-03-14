@@ -1,6 +1,6 @@
 import logging
 import importlib
-from typing import Type
+from typing import Type, TypeVar, Callable
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.conf import settings
@@ -13,32 +13,35 @@ from .fields import RosFieldMixin, RosManyToOneRel, RosForeignKey, RosOneToOneFi
 logger = logging.getLogger()
 
 
-class classproperty(property):
-    def __get__(self, owner_self, owner_cls):
-        if self.fget:
-            return self.fget(owner_cls)
+PropReturn = TypeVar("PropReturn")
+
+
+def classproperty(meth: Callable[..., PropReturn]) -> PropReturn:
+    """Access a @classmethod like a @property."""
+    # mypy doesn't understand class properties yet: https://github.com/python/mypy/issues/2563
+    return classmethod(property(meth))  # type: ignore
 
 
 class RosModel(models.Model):
     """Mixin that will be added to all Django models that will also be present in ROS"""
 
     @classproperty
-    def ros_msgtype(cls: Type):
+    def ros_msgtype(cls: Type):  # type:ignore
         """The type name of the related ROS message"""
         return cls.__name__
 
     @classproperty
-    def ros_rawmsgtype(cls: Type):
+    def ros_rawmsgtype(cls: Type):  # type: ignore
         """The type name of the related raw ROS message"""
         return cls.__name__ + "Raw"
 
     @classproperty
-    def ros_data_field(cls: Type):
+    def ros_data_field(cls: Type):  # type: ignore
         """The ROS field name of the data field"""
         return cls.__name__.lower()
 
     @classproperty
-    def ros_data_field_plural(cls: Type):
+    def ros_data_field_plural(cls: Type):  # type: ignore
         """The ROS field name of the data field for list purpose"""
         return cls.__name__.lower() + "s"
 
@@ -154,7 +157,7 @@ class RosModel(models.Model):
 
                     getattr(self, field.name).set(to_set)
             if hasattr(self, "check_related"):
-                self.check_related()
+                getattr(self, "check_related")()
         return self
 
     def to_ros(self, raw, thin=False):

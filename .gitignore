@@ -6,3 +6,5 @@ example_pkg/build/
 example_pkg/install/
 example_pkg/log/
 example_pkg/generated_interfaces/
+
+venv/
