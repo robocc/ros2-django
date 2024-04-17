@@ -172,16 +172,14 @@ class RosModel(models.Model):
         msgs = importlib.import_module(f"{settings.ROS_INTERFACES_MODULE_NAME}.msg")
         ros_msg = getattr(msgs, self.ros_msgtype if not raw else self.ros_rawmsgtype)()
 
-        if fields:
-            _fields = [self._meta.get_field(_field) for _field in fields]
-        else:
-            _fields = [
-                _field["field"]
-                for _field in self.msg_fields(raw, thin)
-                if "field" in _field
-            ]
+        _fields = {
+            f["name"]: f["field"] for f in self.msg_fields(raw, thin) if "field" in f
+        }
 
-        for field in _fields:
+        if fields:
+            _fields = {f: _fields[f] for f in fields}
+
+        for field in _fields.values():
             if isinstance(field, RosFieldMixin):
                 if isinstance(field, models.ForeignKey):
                     if getattr(self, field.name) is None:
