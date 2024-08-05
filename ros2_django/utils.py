@@ -1,3 +1,4 @@
+from array import array
 import json
 import importlib
 
@@ -17,7 +18,7 @@ def ros2json(ros_obj):
 
             if ros_field:
                 out[field] = ros2obj(value)
-            elif isinstance(value, list):
+            elif isinstance(value, list) or isinstance(value, array):
                 out[field] = [ros2obj(e) for e in value]
             else:
                 out[field] = value
