@@ -1,7 +1,7 @@
 import json
 import importlib
 
-from rclpy.type_support import check_is_valid_msg_type
+from rclpy.type_support import check_is_valid_msg_type  # type:ignore
 
 
 def ros2json(ros_obj):

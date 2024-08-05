@@ -7,7 +7,7 @@ import traceback
 from django.apps import apps
 from django.conf import settings
 
-from rclpy.node import Node
+from rclpy.node import Node  # type:ignore
 
 from .models import RosModel
 

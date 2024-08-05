@@ -10,15 +10,6 @@
             "upgradePackages": "false"
         }
     },
-    "runArgs": [
-        "--net",
-        "host",
-        "-v",
-        "/tmp/.X11-unix:/tmp/.X11-unix",
-        "--privileged",
-        "-v",
-        "/dev:/dev"
-    ],
     "containerEnv": {
         "WORKSPACE_PATH": "${containerWorkspaceFolder}"
     },

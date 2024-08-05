@@ -1,7 +1,12 @@
 import logging
-from typing import Protocol, Callable
-
+from typing import Type, cast, TYPE_CHECKING
 from django.core.exceptions import ObjectDoesNotExist
+
+from .types import Ros2SrvDef
+
+if TYPE_CHECKING:
+    from .fields import RosFieldMixin
+    from .models import RosModel
 
 logger = logging.getLogger()
 
@@ -10,17 +15,10 @@ logger = logging.getLogger()
 #
 
 
-class RosSrv(Protocol):
-    name: str
-    inputs: list[dict]
-    outputs: list[dict]
-    cb: Callable
-
-
-class RosGetSrv(RosSrv):
+class RosGetSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for Get"""
 
-    def __init__(self, model, search_field, raw):
+    def __init__(self, model: Type["RosModel"], search_field, raw):
         self.model = model
         self.search_field = search_field
         self.raw = raw
@@ -35,11 +33,22 @@ class RosGetSrv(RosSrv):
 
         self.inputs = [
             {
-                "type": model._meta.get_field(field).ros_type,
-                "name": model._meta.get_field(field).ros_name,
+                "type": cast("RosFieldMixin", model._meta.get_field(field)).ros_type,
+                "name": cast("RosFieldMixin", model._meta.get_field(field)).ros_name,
             }
             for field in self.search_field
         ]
+
+        self.inputs.append(
+            {
+                "type": "string[]",
+                "name": "fields",
+                "enum": [
+                    (f"FIELD_{field['name'].upper()}", field["name"])
+                    for field in model.msg_fields(raw)
+                ],
+            }
+        )
 
         self.outputs = [
             {"type": "bool", "name": "success"},
@@ -54,7 +63,8 @@ class RosGetSrv(RosSrv):
         try:
             query = {
                 self.model._meta.get_field(field).name: getattr(
-                    request, self.model._meta.get_field(field).ros_name
+                    request,
+                    cast("RosFieldMixin", self.model._meta.get_field(field)).ros_name,
                 )
                 for field in self.search_field
             }
@@ -65,11 +75,15 @@ class RosGetSrv(RosSrv):
             return response
 
         response.success = True
-        setattr(response, self.model.ros_data_field, obj.to_ros(self.raw))
+        setattr(
+            response,
+            self.model.ros_data_field,
+            obj.to_ros(raw=self.raw, fields=request.fields),
+        )
         return response
 
 
-class RosSetSrv(RosSrv):
+class RosSetSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for Set"""
 
     def __init__(self, model, search_field, raw):
@@ -138,7 +152,7 @@ class RosSetSrv(RosSrv):
         return response
 
 
-class RosListSrv(RosSrv):
+class RosListSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for List"""
 
     def __init__(self, model, filter_field, raw):
@@ -185,7 +199,7 @@ class RosListSrv(RosSrv):
         return response
 
 
-class RosDeleteSrv(RosSrv):
+class RosDeleteSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for Delete"""
 
     def __init__(self, model, search_field, raw):

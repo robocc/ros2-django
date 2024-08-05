@@ -1,7 +1,7 @@
 {
-    "python.formatting.provider": "black",
-    "python.linting.flake8Args": [
+    "python.envFile": "${workspaceFolder}/.vscode/.env",
+    "flake8.args": [
         "--max-line-length=100"
     ],
-    "python.envFile": "${workspaceFolder}/.vscode/.env",
+    "editor.defaultFormatter": "ms-python.black-formatter",
 }
