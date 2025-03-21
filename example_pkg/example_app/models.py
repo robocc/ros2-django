@@ -19,7 +19,7 @@ class Map(RosModel):
 
 class PoseOnMap(RosModel):
     id = ros2_django.fields.RosBigAutoField(primary_key=True)
-    name = ros2_django.fields.RosCharField(max_length=128)
+    name = ros2_django.fields.RosCharField(max_length=128, default="Bob")
     pose = ros2_django.fields.RosMsgField(ros_msg=Pose, ros_type="geometry_msgs/Pose")
     map = ros2_django.fields.RosForeignKey(
         "Map",
