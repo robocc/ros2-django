@@ -109,7 +109,13 @@ class RosModel(models.Model):
                     "type": field.ros_type,
                     "field": field,  # type: ignore (no intersect type in python :()
                 }
-                if field.ros_default is not None:
+                if (
+                    hasattr(field, "default")
+                    and field.default != models.fields.NOT_PROVIDED
+                    and not callable(field.default)
+                ):
+                    f["default"] = field.default
+                elif field.ros_default is not None:
                     f["default"] = field.ros_default
                 fields.append(f)
             else:
