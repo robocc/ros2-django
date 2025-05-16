@@ -46,6 +46,34 @@ You can also run
 ```
 and connect to http://localhost:8000 to access admin interface
 
+### Test getting/setting data
+
+Once ROS node is started, you can create/get data to and from django, e.g. via ros2 cli
+
+```sh
+$ ros2 service call /example_pkg/list_map example_pkg/srv/ListMap
+response:
+example_pkg.srv.ListMap_Response(success=True, message='', maps=[example_pkg.msg.Map(poseonmaps=[example_pkg.msg.PoseOnMap(id=1, name='Test', pose=geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=4.0, y=5.0, z=0.0), orientation=geometry_msgs.msg.Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)), id_map=1)], id=1, name='TEst', description='fsadf', webp=[])])
+$ ros2 service call /example_pkg/set_pose_on_map example_pkg/srv/SetPoseOnMap 'poseonmap:
+  id: 1 
+  name: Test2
+  pose:
+    position:
+      x: 5.0
+      y: 0.0
+      z: 0.0
+    orientation:
+      x: 4.0
+      y: 0.0
+      z: 0.0
+      w: 1.0
+  id_map: -1' 
+requester: making request: example_pkg.srv.SetPoseOnMap_Request(poseonmap=example_pkg.msg.PoseOnMap(id=1, name='Test2', pose=geometry_msgs.msg.Pose(position=geometry_msgs.msg.Point(x=5.0, y=0.0, z=0.0), orientation=geometry_msgs.msg.Quaternion(x=4.0, y=0.0, z=0.0, w=1.0)), id_map=-1))
+
+response:
+example_pkg.srv.SetPoseOnMap_Response(success=True, message='', id=1)
+```
+
 ### models.py
 
 From now, you can edit your application `models.py` and create your model objects. 

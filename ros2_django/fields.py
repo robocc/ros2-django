@@ -6,7 +6,6 @@ from django.db import models
 from django.core.exceptions import ValidationError
 import jsonschema
 from jsonschema.exceptions import ValidationError as JsonValidationError
-from rclpy.serialization import serialize_message, deserialize_message  # type:ignore
 
 from .utils import ros2json, json2ros
 
@@ -126,7 +125,7 @@ class RosJSONField(RosFieldMixin, models.JSONField):
         return json.loads(value)
 
 
-class RosMsgField(RosFieldMixin, models.Field):
+class RosMsgField(RosFieldMixin, models.JSONField):
     description = "ROS msg data"
     empty_values = [None]
 
@@ -141,41 +140,14 @@ class RosMsgField(RosFieldMixin, models.Field):
         kwargs["ros_type"] = self.ros_type
         return name, path, args, kwargs
 
-    #
-    # Internal type is binary
-    #
-
-    def get_internal_type(self):
-        return "BinaryField"
-
-    def get_db_prep_value(self, value, connection, prepared=False):
-        value = super().get_db_prep_value(value, connection, prepared)
-        if value is not None:
-            return connection.Database.Binary(value)
-        return value
-
-    # ROS/Python conversion, value is from db (bytes)
-
+    # ROS/Python conversion
     def py2ros(self, value):
         if value is None:
             return self.ros_msg()
-        return deserialize_message(value, self.ros_msg)
+        return json2ros(json.dumps(value), self.ros_msg)
 
     def ros2py(self, value):
-        return serialize_message(value)
-
-    # DB/Fields conversion (for admin interface)
-
-    def value_from_object(self, obj):
-        value = super().value_from_object(obj)
-        return ros2json(self.py2ros(value))
-
-    def to_python(self, value):
-        return self.ros2py(json2ros(value, self.ros_msg))
-
-    # DB/string conversion (for loaddata/dumpdata)
-    def value_to_string(self, obj):
-        return self.value_from_object(obj)
+        return json.loads(ros2json(value))
 
 
 class RosManyToOneRel(RosFieldMixin, models.ManyToOneRel):
