@@ -1,10 +1,10 @@
 {
     "name": "ROS",
-    "image": "ros:iron",
+    "image": "ros:jazzy",
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {
             "installZsh": "true",
-            "username": "vscode",
+            "username": "ubuntu",
             "userUid": "1000",
             "userGid": "1000",
             "upgradePackages": "false"
@@ -13,7 +13,7 @@
     "containerEnv": {
         "WORKSPACE_PATH": "${containerWorkspaceFolder}"
     },
-    "remoteUser": "vscode",
+    "remoteUser": "ubuntu",
     "customizations": {
         "vscode": {
             "extensions": [
