@@ -2,7 +2,7 @@ from typing import Protocol, Callable, TypedDict, Any, Type, cast, TYPE_CHECKING
 from typing_extensions import NotRequired
 
 from django.db.models import Field
-from .fields import RosFieldMixin
+from .fields import RosComputedField, RosFieldMixin
 
 
 class GenericField(RosFieldMixin, Field): ...
@@ -13,7 +13,7 @@ class Ros2MsgFieldDef(TypedDict):
     name: str
     enum: NotRequired[list[tuple[str, Any]]]
     default: NotRequired[Any]
-    field: NotRequired[GenericField]
+    field: NotRequired[GenericField | RosComputedField]
 
 
 class Ros2SrvDef(Protocol):

@@ -8,7 +8,13 @@ from django.conf import settings
 from django.db import models, transaction
 
 from .services import RosGetSrv, RosSetSrv, RosDeleteSrv, RosListSrv
-from .fields import RosFieldMixin, RosManyToOneRel, RosForeignKey, RosOneToOneField
+from .fields import (
+    RosComputedField,
+    RosFieldMixin,
+    RosManyToOneRel,
+    RosForeignKey,
+    RosOneToOneField,
+)
 from .types import Ros2SrvDef, Ros2MsgFieldDef
 
 logger = logging.getLogger()
@@ -27,7 +33,7 @@ class RosModel(models.Model):
     """Mixin that will be added to all Django models that will also be present in ROS"""
 
     @classproperty
-    def ros_msgtype(cls: Type):  # type:ignore
+    def ros_msgtype(cls: Type):  # type: ignore
         """The type name of the related ROS message"""
         return cls.__name__
 
@@ -87,7 +93,12 @@ class RosModel(models.Model):
         fields: list[Ros2MsgFieldDef] = []
         ros_meta = getattr(cls, "RosMeta", None)
 
-        for field in cls._meta.get_fields():
+        all_fields: list = list(cls._meta.get_fields())
+        if ros_meta and hasattr(ros_meta, "computed_fields"):
+            for name, return_type in getattr(ros_meta, "computed_fields", []):
+                all_fields.append(RosComputedField(name, return_type))
+
+        for field in all_fields:
             if raw and isinstance(field, models.ManyToOneRel):
                 continue
             if (
@@ -111,10 +122,10 @@ class RosModel(models.Model):
                 }
                 if (
                     hasattr(field, "default")
-                    and field.default != models.fields.NOT_PROVIDED
-                    and not callable(field.default)
+                    and getattr(field, "default") != models.fields.NOT_PROVIDED
+                    and not callable(getattr(field, "default"))
                 ):
-                    f["default"] = field.default
+                    f["default"] = getattr(field, "default")
                 elif field.ros_default is not None:
                     f["default"] = field.ros_default
                 fields.append(f)
@@ -135,7 +146,12 @@ class RosModel(models.Model):
 
         with transaction.atomic():
             for msg_field in self.msg_fields(raw):
-                field = msg_field["field"]
+                field = msg_field.get("field")
+                if field is None:
+                    continue
+                if isinstance(field, RosComputedField):
+                    continue
+
                 if field.name == "id" and getattr(ros_msg, "id"):
                     id = getattr(ros_msg, "id")
                     if id != -1:
@@ -156,7 +172,9 @@ class RosModel(models.Model):
                     )
             self.save()
             for msg_field in self.msg_fields(raw):
-                field = msg_field["field"]
+                field = msg_field.get("field")
+                if field is None:
+                    continue
                 if isinstance(field, RosManyToOneRel):
                     getattr(self, field.name).all().delete()
 
@@ -196,6 +214,8 @@ class RosModel(models.Model):
                     try:
                         if isinstance(field, RosManyToOneRel):
                             value = field.py2ros(getattr(self, field.name), thin=thin)
+                        elif isinstance(field, RosComputedField):
+                            value = field.py2ros(getattr(self, field.name)())
                         else:
                             value = field.py2ros(getattr(self, field.name))  # type: ignore
                     except ObjectDoesNotExist:
@@ -212,3 +232,17 @@ class RosModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class ros_computed_field:
+    def __init__(self, fn):
+        self.fn = fn
+
+    def __set_name__(self, cls, name):
+        setattr(cls, name, self.fn)
+        if not hasattr(cls, "RosMeta"):
+            cls.RosMeta = type("RosMeta", (object,), {})
+        if not hasattr(cls.RosMeta, "computed_fields"):
+            cls.RosMeta.computed_fields = []  # type: ignore
+        cls.RosMeta.computed_fields.append((name, self.fn.__annotations__['return']))  # type: ignore
+

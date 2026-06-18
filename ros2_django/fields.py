@@ -1,14 +1,15 @@
 import datetime
 import json
+import types
 from typing import Type
 
 from django.db import models
 from django.core.exceptions import ValidationError
 import jsonschema
 from jsonschema.exceptions import ValidationError as JsonValidationError
-from rclpy.serialization import serialize_message, deserialize_message  # type:ignore
+from rclpy.serialization import serialize_message, deserialize_message
 
-from .utils import ros2json, json2ros
+from .utils import convert_type, ros2json, json2ros
 
 #
 # Ros fields
@@ -205,7 +206,7 @@ class RosMsgFieldJSON(RosFieldMixin, models.JSONField):
 
 class RosManyToOneRel(RosFieldMixin, models.ManyToOneRel):
     @property
-    def ros_type(self):
+    def ros_type(self):  # type: ignore
         from .models import RosModel
 
         if issubclass(self.related_model, RosModel):
@@ -213,8 +214,8 @@ class RosManyToOneRel(RosFieldMixin, models.ManyToOneRel):
 
         raise Exception("ROS related field should be related to a RosModel")
 
-    def py2ros(self, values, thin=False):
-        return [v.to_ros(False, thin) for v in values.all()]
+    def py2ros(self, value, thin=False):
+        return [v.to_ros(False, thin) for v in value.all()]
 
 
 class RosForeignKey(RosFieldMixin, models.ForeignKey):
@@ -233,7 +234,7 @@ class RosForeignKey(RosFieldMixin, models.ForeignKey):
 
 class RosOneToOneRel(RosFieldMixin, models.OneToOneRel):
     @property
-    def ros_type(self):
+    def ros_type(self) -> str:  # type: ignore
         from .models import RosModel
 
         if issubclass(self.related_model, RosModel):
@@ -253,3 +254,60 @@ class RosOneToOneField(RosFieldMixin, models.OneToOneField):
     @property
     def ros_name(self):
         return "id_" + self.name
+
+
+class RosComputedField(RosFieldMixin):
+    def __init__(self, name, return_type):
+        self.name = name
+
+        self.return_type = return_type
+        self.is_list = False
+        if (
+            isinstance(return_type, types.GenericAlias)
+            and isinstance(return_type.__origin__, type)
+            and issubclass(return_type.__origin__, list)
+        ):
+            self.is_list = True
+            self.return_type = return_type.__args__[0]
+
+    @property
+    def ros_name(self):
+        return self.name
+
+    @property
+    def ros_type(self) -> str:  # type: ignore
+        out = ""
+        if issubclass(self.return_type, str):
+            out = "string"
+        elif issubclass(self.return_type, int):
+            out = "int32"
+        elif issubclass(self.return_type, float):
+            out = "float32"
+        elif issubclass(self.return_type, bool):
+            out = "bool"
+        elif hasattr(self.return_type, "SLOT_TYPES"):
+            # Probably a ROS msg
+            out = self.return_type.__name__
+        elif hasattr(self.return_type, "ros_msgtype"):
+            out = self.return_type.ros_msgtype
+        else:
+            raise Exception(f"Unable to determine ROS type for {self.return_type}")
+
+        if self.is_list:
+            out += "[]"
+
+        return out
+
+    def py2ros(self, value, one_element=False):
+        if self.is_list and not one_element:
+            if not isinstance(value, list):
+                raise Exception("Expecting list")
+
+            return [self.py2ros(e, True) for e in value]
+
+        if hasattr(self.return_type, "to_ros"):
+            return value.to_ros(False)
+        elif hasattr(value, "SLOT_TYPES"):
+            return value
+        else:
+            return convert_type(value, self.ros_type)

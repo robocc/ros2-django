@@ -1,7 +1,22 @@
 from django.db import models
-from ros2_django.models import RosModel
+from ros2_django.models import RosModel, ros_computed_field
 import ros2_django.fields
 from geometry_msgs.msg import Pose
+
+
+class PoseOnMap(RosModel):
+    id = ros2_django.fields.RosBigAutoField(primary_key=True)
+    name = ros2_django.fields.RosCharField(max_length=128, default="Bob")
+    pose = ros2_django.fields.RosMsgField(ros_msg=Pose, ros_type="geometry_msgs/Pose")
+    map = ros2_django.fields.RosForeignKey(
+        "Map", on_delete=models.CASCADE, related_name="poses"
+    )
+
+    def __str__(self):
+        return f"Pose {self.name} @ {self.map}"
+
+    class RosMeta:
+        ros_filter = ["map"]
 
 
 class Map(RosModel):
@@ -13,21 +28,13 @@ class Map(RosModel):
     def __str__(self):
         return f"[{self.id}] {self.name}"
 
+    @ros_computed_field
+    def poses_with_default_name(self) -> list[PoseOnMap]:
+        return list(self.poses.filter(name="Bob"))
+
+    @ros_computed_field
+    def useless(self) -> str:
+        return "I'm useless"
+
     class RosMeta:
         ros_thin_fields = ["id", "name", "description", "poseonmaps"]
-
-
-class PoseOnMap(RosModel):
-    id = ros2_django.fields.RosBigAutoField(primary_key=True)
-    name = ros2_django.fields.RosCharField(max_length=128, default="Bob")
-    pose = ros2_django.fields.RosMsgField(ros_msg=Pose, ros_type="geometry_msgs/Pose")
-    map = ros2_django.fields.RosForeignKey(
-        "Map",
-        on_delete=models.CASCADE,
-    )
-
-    def __str__(self):
-        return f"Pose {self.name} @ {self.map}"
-
-    class RosMeta:
-        ros_filter = ["map"]
