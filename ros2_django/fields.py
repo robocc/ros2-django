@@ -311,4 +311,4 @@ class RosComputedField(RosFieldMixin):
         elif hasattr(value, "SLOT_TYPES"):
             return value
         else:
-            return convert_type(value, self.ros_type)
+            return convert_type(value, self.ros_type.strip('[]'))
