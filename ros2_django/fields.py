@@ -224,7 +224,8 @@ class RosForeignKey(RosFieldMixin, models.ForeignKey):
     rel_class = RosManyToOneRel
 
     def __init__(self, *args, **kwargs):
-        kwargs["related_name"] = "%(class)ss"
+        if "related_name" not in kwargs:
+            kwargs["related_name"] = "%(class)ss"
         super().__init__(*args, **kwargs)
 
     @property
