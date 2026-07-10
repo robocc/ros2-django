@@ -95,8 +95,8 @@ class RosModel(models.Model):
 
         all_fields: list = list(cls._meta.get_fields())
         if ros_meta and hasattr(ros_meta, "computed_fields"):
-            for name, return_type in getattr(ros_meta, "computed_fields", []):
-                all_fields.append(RosComputedField(name, return_type))
+            for name, return_type, setter in getattr(ros_meta, "computed_fields", []):
+                all_fields.append(RosComputedField(name, return_type, setter))
 
         for field in all_fields:
             if raw and isinstance(field, models.ManyToOneRel):
@@ -141,15 +141,17 @@ class RosModel(models.Model):
     def has_raw(cls):
         return cls.msg_fields(True) != cls.msg_fields(False)
 
-    def from_ros(self, ros_msg, raw, parent=None):
+    def from_ros(self, ros_msg, raw, parent=None, fields=None):
         """Class method to create a model object from a ros object"""
 
+        all_fields = self.msg_fields(raw)
+        if fields:
+            all_fields = [f for f in all_fields if f["name"] in fields]
+
         with transaction.atomic():
-            for msg_field in self.msg_fields(raw):
+            for msg_field in all_fields:
                 field = msg_field.get("field")
                 if field is None:
-                    continue
-                if isinstance(field, RosComputedField):
                     continue
 
                 if field.name == "id" and getattr(ros_msg, "id"):
@@ -166,6 +168,12 @@ class RosModel(models.Model):
                         setattr(self, field.name + "_id", rel_id)
                     elif parent is not None and isinstance(parent, field.related_model):
                         setattr(self, field.name + "_id", parent.id)
+                elif isinstance(field, RosComputedField):
+                    if field.setter is None:
+                        pass
+                        # raise Exception(f"Field {field.name} is read only")
+                    else:
+                        field.setter(self, getattr(ros_msg, field.ros_name))
                 elif hasattr(ros_msg, field.ros_name):
                     setattr(
                         self, field.name, field.ros2py(getattr(ros_msg, field.ros_name))
@@ -212,10 +220,10 @@ class RosModel(models.Model):
                         value = getattr(self, field.name).id
                 else:
                     try:
-                        if isinstance(field, RosManyToOneRel):
-                            value = field.py2ros(getattr(self, field.name), thin=thin)
-                        elif isinstance(field, RosComputedField):
+                        if isinstance(field, RosComputedField):
                             value = field.py2ros(getattr(self, field.name)())
+                        elif isinstance(field, RosManyToOneRel):
+                            value = field.py2ros(getattr(self, field.name), thin=thin)
                         else:
                             value = field.py2ros(getattr(self, field.name))  # type: ignore
                     except ObjectDoesNotExist:
@@ -244,5 +252,31 @@ class ros_computed_field:
             cls.RosMeta = type("RosMeta", (object,), {})
         if not hasattr(cls.RosMeta, "computed_fields"):
             cls.RosMeta.computed_fields = []  # type: ignore
-        cls.RosMeta.computed_fields.append((name, self.fn.__annotations__['return']))  # type: ignore
+        cls.RosMeta.computed_fields.append((name, self.fn.__annotations__["return"], None))  # type: ignore
 
+
+def ros_computed_field_setter(field: str):
+    class ros_computed_field_setter:
+        def __init__(self, fn):
+            self.fn = fn
+
+        def __set_name__(self, cls, name):
+            setattr(cls, name, self.fn)
+            if not hasattr(cls, "RosMeta"):
+                cls.RosMeta = type("RosMeta", (object,), {})
+
+            # Find getter
+            for tpl in getattr(cls.RosMeta, "computed_fields", []):
+                if tpl[0] == field:
+                    break
+            else:
+                raise Exception(f"{field} is not a computed field")
+
+            if tpl[2] is not None:
+                raise Exception(f"Setter for {field} already defined")
+
+            new_tpl = (tpl[0], tpl[1], self.fn)
+            cls.RosMeta.computed_fields.remove(tpl)
+            cls.RosMeta.computed_fields.append(new_tpl)
+
+    return ros_computed_field_setter

@@ -258,8 +258,9 @@ class RosOneToOneField(RosFieldMixin, models.OneToOneField):
 
 
 class RosComputedField(RosFieldMixin):
-    def __init__(self, name, return_type):
+    def __init__(self, name, return_type, setter=None):
         self.name = name
+        self.setter = setter
 
         self.return_type = return_type
         self.is_list = False
@@ -311,4 +312,4 @@ class RosComputedField(RosFieldMixin):
         elif hasattr(value, "SLOT_TYPES"):
             return value
         else:
-            return convert_type(value, self.ros_type.strip('[]'))
+            return convert_type(value, self.ros_type.strip("[]"))

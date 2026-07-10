@@ -103,7 +103,15 @@ class RosSetSrv(Ros2SrvDef):
             {
                 "type": model.ros_msgtype if not raw else model.ros_rawmsgtype,
                 "name": model.ros_data_field,
-            }
+            },
+            {
+                "type": "string[]",
+                "name": "fields",
+                "enum": [
+                    (f"FIELD_{field['name'].upper()}", field["name"])
+                    for field in model.msg_fields(raw)
+                ],
+            },
         ]
 
         self.outputs = [
@@ -142,7 +150,9 @@ class RosSetSrv(Ros2SrvDef):
             # We force id to -1 to ignore it in the set
             getattr(request, self.model.ros_data_field).id = -1
 
-        obj.from_ros(getattr(request, self.model.ros_data_field), self.raw)
+        obj.from_ros(
+            getattr(request, self.model.ros_data_field), self.raw, fields=request.fields
+        )
 
         response.success = True
         response.message = ""
@@ -161,7 +171,16 @@ class RosListSrv(Ros2SrvDef):
         self.raw = raw
 
         self.name = f"List{model.ros_msgtype if not raw else model.ros_rawmsgtype }"
-        self.inputs = []
+        self.inputs = [
+            {
+                "type": "string[]",
+                "name": "fields",
+                "enum": [
+                    (f"FIELD_{field['name'].upper()}", field["name"])
+                    for field in model.msg_fields(raw)
+                ],
+            }
+        ]
 
         if self.filter_field:
             self.filter_field = model._meta.get_field(self.filter_field)
@@ -194,7 +213,7 @@ class RosListSrv(Ros2SrvDef):
         setattr(
             response,
             self.model.ros_data_field_plural,
-            [obj.to_ros(self.raw, thin=True) for obj in objs],
+            [obj.to_ros(self.raw, thin=True, fields=request.fields) for obj in objs],
         )
         return response
 
