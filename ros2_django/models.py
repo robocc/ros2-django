@@ -179,12 +179,19 @@ class RosModel(models.Model):
                         self, field.name, field.ros2py(getattr(ros_msg, field.ros_name))
                     )
             self.save()
-            for msg_field in self.msg_fields(raw):
+            for msg_field in all_fields:
                 field = msg_field.get("field")
                 if field is None:
                     continue
                 if isinstance(field, RosManyToOneRel):
-                    getattr(self, field.name).all().delete()
+                    if field.remote_field.null is False:
+                        # Delete children if then can't be null
+                        getattr(self, field.name).all().delete()
+                    else:
+                        # Or set null else
+                        for child in getattr(self, field.name).all():
+                            setattr(child, field.remote_field.name, None)
+                            child.save()
 
                     to_set = []
                     for child in getattr(ros_msg, field.ros_name):
