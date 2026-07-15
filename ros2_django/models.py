@@ -158,7 +158,10 @@ class RosModel(models.Model):
                     id = getattr(ros_msg, "id")
                     if id != -1:
                         setattr(self, field.name, id)
-                elif isinstance(field, RosManyToOneRel):
+                elif isinstance(field, RosManyToOneRel) or isinstance(
+                    field, RosComputedField
+                ):
+                    # Handled later (after save)
                     continue
                 elif isinstance(field, RosForeignKey) or isinstance(
                     field, RosOneToOneField
@@ -168,12 +171,6 @@ class RosModel(models.Model):
                         setattr(self, field.name + "_id", rel_id)
                     elif parent is not None and isinstance(parent, field.related_model):
                         setattr(self, field.name + "_id", parent.id)
-                elif isinstance(field, RosComputedField):
-                    if field.setter is None:
-                        pass
-                        # raise Exception(f"Field {field.name} is read only")
-                    else:
-                        field.setter(self, getattr(ros_msg, field.ros_name))
                 elif hasattr(ros_msg, field.ros_name):
                     setattr(
                         self, field.name, field.ros2py(getattr(ros_msg, field.ros_name))
@@ -201,6 +198,12 @@ class RosModel(models.Model):
                                 to_set.append(m.from_ros(child, raw, parent=self))
 
                     getattr(self, field.name).set(to_set)
+                elif isinstance(field, RosComputedField):
+                    if field.setter is None:
+                        pass
+                        # raise Exception(f"Field {field.name} is read only")
+                    else:
+                        field.setter(self, getattr(ros_msg, field.ros_name))
             if hasattr(self, "check_related"):
                 getattr(self, "check_related")()
         return self
