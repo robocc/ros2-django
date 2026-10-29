@@ -99,8 +99,8 @@ class RosModel(models.Model):
         ros_meta = getattr(cls, "RosMeta", None)
 
         all_fields: list = list(cls._meta.get_fields())
-        if ros_meta and hasattr(ros_meta, "computed_fields"):
-            for name, return_type, setter in getattr(ros_meta, "computed_fields", []):
+        if hasattr(cls, "_ros_computed_fields"):
+            for name, return_type, setter in getattr(cls, "_ros_computed_fields", []):
                 all_fields.append(RosComputedField(name, return_type, setter))
 
         for field in all_fields:
@@ -265,11 +265,9 @@ class ros_computed_field:
 
     def __set_name__(self, cls, name):
         setattr(cls, name, self.fn)
-        if not hasattr(cls, "RosMeta"):
-            cls.RosMeta = type("RosMeta", (object,), {})
-        if not hasattr(cls.RosMeta, "computed_fields"):
-            cls.RosMeta.computed_fields = []  # type: ignore
-        cls.RosMeta.computed_fields.append((name, self.fn.__annotations__["return"], None))  # type: ignore
+        cls._ros_computed_fields = getattr(cls, "_ros_computed_fields", []) + [
+            (name, self.fn.__annotations__["return"], None)
+        ]  # type: ignore
 
 
 def ros_computed_field_setter(field: str):
@@ -279,11 +277,8 @@ def ros_computed_field_setter(field: str):
 
         def __set_name__(self, cls, name):
             setattr(cls, name, self.fn)
-            if not hasattr(cls, "RosMeta"):
-                cls.RosMeta = type("RosMeta", (object,), {})
-
             # Find getter
-            for tpl in getattr(cls.RosMeta, "computed_fields", []):
+            for tpl in getattr(cls, "_ros_computed_fields", []):
                 if tpl[0] == field:
                     break
             else:
@@ -293,7 +288,7 @@ def ros_computed_field_setter(field: str):
                 raise Exception(f"Setter for {field} already defined")
 
             new_tpl = (tpl[0], tpl[1], self.fn)
-            cls.RosMeta.computed_fields.remove(tpl)  # type: ignore
-            cls.RosMeta.computed_fields.append(new_tpl)  # type: ignore
+            cls._ros_computed_fields.remove(tpl)  # type: ignore
+            cls._ros_computed_fields.append(new_tpl)  # type: ignore
 
     return ros_computed_field_setter

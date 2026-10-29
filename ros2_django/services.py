@@ -54,9 +54,7 @@ def handle_ros_search(
             field = Ros2MsgFieldDef(
                 type=cast("RosFieldMixin", model._meta.get_field(field_name)).ros_type,
                 name=cast("RosFieldMixin", model._meta.get_field(field_name)).ros_name,
-                django_filter=cast(
-                    "RosFieldMixin", model._meta.get_field(field_name)
-                ).ros_name,
+                django_filter=model._meta.get_field(field_name).name,
             )
         fields.append(field)
 
