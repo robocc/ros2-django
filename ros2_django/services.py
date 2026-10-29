@@ -119,14 +119,18 @@ class RosGetSrv(Ros2SrvDef):
 class RosSetSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for Set"""
 
-    def __init__(self, model: Type["RosModel"], search_field, raw):
+    def __init__(self, model: Type["RosModel"], selector_field, raw):
         self.model = model
         self.raw = raw
 
         self.name = f"Set{model.ros_msgtype if not raw else model.ros_rawmsgtype}"
-        self.search_field = handle_ros_search(search_field=search_field, model=model)
-        if self.search_field["label"]:
-            self.name += f"By{self.search_field["label"]}"
+        self.selector_field = handle_ros_search(selector_field, model=model)
+        if self.selector_field["label"]:
+            self.name += f"By{self.selector_field["label"]}"
+
+        for selector in self.selector_field["fields"]:
+            if "django_filter" in selector and "__" in selector["django_filter"]:
+                raise Exception("Selector does not support related fields")
 
         self.inputs = [
             {
@@ -157,14 +161,17 @@ class RosSetSrv(Ros2SrvDef):
     def cb(self, request, response):
         try:
             query = {
-                field["django_filter"]: getattr(request, field["name"])
-                for field in self.search_field["fields"]
+                field["django_filter"]: getattr(
+                    getattr(request, self.model.ros_data_field),
+                    self.model._meta.get_field(field["name"]).ros_name,  # type: ignore
+                )
+                for field in self.selector_field["fields"]
                 if "django_filter" in field
             }
             obj = self.model.objects.get(**query)
         except ObjectDoesNotExist:
             if (
-                self.search_field["fields"][0]["name"] == "id"
+                self.selector_field["fields"][0]["name"] == "id"
                 and getattr(request, self.model.ros_data_field).id != -1
             ):
                 response.success = False
@@ -173,7 +180,7 @@ class RosSetSrv(Ros2SrvDef):
 
             obj = self.model()
 
-        if self.search_field["fields"][0]["name"] != "id":
+        if self.selector_field["fields"][0]["name"] != "id":
             # We force id to -1 to ignore it in the set
             getattr(request, self.model.ros_data_field).id = -1
 

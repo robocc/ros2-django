@@ -67,19 +67,24 @@ class RosModel(models.Model):
             if raw and not cls.has_raw():
                 continue
 
-            # Get/Set/Delete
+            # Get/Delete
             search_fields = ["id"]
             if ros_meta:
                 search_fields += getattr(ros_meta, "ros_search", [])
             for search_field in search_fields:
                 cls._services.append(RosGetSrv(cls, search_field, raw))
-                cls._services.append(RosSetSrv(cls, search_field, raw))
                 if not raw:
                     cls._services.append(RosDeleteSrv(cls, search_field, raw))
+            # Set
+            selector_fields = ["id"]
+            if ros_meta:
+                search_fields += getattr(ros_meta, "ros_selector", [])
+            for selector_field in selector_fields:
+                cls._services.append(RosSetSrv(cls, selector_field, raw))
 
             # List
             filter_fields = [None]
-            if hasattr(cls, "RosMeta"):
+            if ros_meta:
                 filter_fields += getattr(ros_meta, "ros_filter", [])
             for filter_field in filter_fields:
                 cls._services.append(RosListSrv(cls, filter_field, raw))
@@ -288,7 +293,7 @@ def ros_computed_field_setter(field: str):
                 raise Exception(f"Setter for {field} already defined")
 
             new_tpl = (tpl[0], tpl[1], self.fn)
-            cls.RosMeta.computed_fields.remove(tpl)
-            cls.RosMeta.computed_fields.append(new_tpl)
+            cls.RosMeta.computed_fields.remove(tpl)  # type: ignore
+            cls.RosMeta.computed_fields.append(new_tpl)  # type: ignore
 
     return ros_computed_field_setter
