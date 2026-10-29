@@ -139,7 +139,9 @@ class RosModel(models.Model):
 
     @classmethod
     def has_raw(cls):
-        return cls.msg_fields(True) != cls.msg_fields(False)
+        return [f["name"] for f in cls.msg_fields(True)] != [
+            f["name"] for f in cls.msg_fields(False)
+        ]
 
     def from_ros(self, ros_msg, raw, parent=None, fields=None):
         """Class method to create a model object from a ros object"""
