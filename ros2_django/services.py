@@ -2,7 +2,7 @@ import logging
 from typing import Type, cast, TYPE_CHECKING
 from django.core.exceptions import ObjectDoesNotExist
 
-from .types import Ros2SrvDef
+from .types import Ros2SrvDef, RosSearchMeta, Ros2MsgFieldDef
 
 if TYPE_CHECKING:
     from .fields import RosFieldMixin
@@ -15,30 +15,65 @@ logger = logging.getLogger()
 #
 
 
+def handle_ros_search(
+    search_field: tuple | str, model: Type["RosModel"]
+) -> RosSearchMeta:
+    if not isinstance(search_field, tuple):
+        search_field = (search_field,)
+
+    if search_field[0] != "id":
+        label = search_field[0].capitalize()
+        if "__" in label:
+            label = label.split("__")[-1].capitalize()
+    else:
+        label = ""
+
+    fields = []
+    for field_name in search_field:
+        if "__" in field_name:
+            related = model
+            for related_name in field_name.split("__")[:-1]:
+                related = related._meta.get_field(related_name).related_model
+                if related is None:
+                    raise Exception(
+                        f"Unable to find foreign path for field {field_name}"
+                    )
+
+            related_field_name = field_name.split("__")[-1]
+
+            field = Ros2MsgFieldDef(
+                type=cast(
+                    "RosFieldMixin", related._meta.get_field(related_field_name)
+                ).ros_type,
+                name=cast(
+                    "RosFieldMixin", related._meta.get_field(related_field_name)
+                ).ros_name,
+                django_filter=field_name,
+            )
+        else:
+            field = Ros2MsgFieldDef(
+                type=cast("RosFieldMixin", model._meta.get_field(field_name)).ros_type,
+                name=cast("RosFieldMixin", model._meta.get_field(field_name)).ros_name,
+                django_filter=model._meta.get_field(field_name).name,
+            )
+        fields.append(field)
+
+    return RosSearchMeta(label=label, fields=fields)
+
+
 class RosGetSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for Get"""
 
     def __init__(self, model: Type["RosModel"], search_field, raw):
         self.model = model
-        self.search_field = search_field
         self.raw = raw
 
         self.name = f"Get{model.ros_msgtype if not raw else model.ros_rawmsgtype}"
+        self.search_field = handle_ros_search(search_field=search_field, model=model)
+        if self.search_field["label"]:
+            self.name += f"By{self.search_field["label"]}"
 
-        if not isinstance(self.search_field, tuple):
-            self.search_field = (self.search_field,)
-
-        if self.search_field[0] != "id":
-            self.name += f"By{self.search_field[0].capitalize()}"
-
-        self.inputs = [
-            {
-                "type": cast("RosFieldMixin", model._meta.get_field(field)).ros_type,
-                "name": cast("RosFieldMixin", model._meta.get_field(field)).ros_name,
-            }
-            for field in self.search_field
-        ]
-
+        self.inputs = self.search_field["fields"]
         self.inputs.append(
             {
                 "type": "string[]",
@@ -62,11 +97,9 @@ class RosGetSrv(Ros2SrvDef):
     def cb(self, request, response):
         try:
             query = {
-                self.model._meta.get_field(field).name: getattr(
-                    request,
-                    cast("RosFieldMixin", self.model._meta.get_field(field)).ros_name,
-                )
-                for field in self.search_field
+                field["django_filter"]: getattr(request, field["name"])
+                for field in self.search_field["fields"]
+                if "django_filter" in field
             }
             obj = self.model.objects.get(**query)
         except ObjectDoesNotExist:
@@ -86,18 +119,18 @@ class RosGetSrv(Ros2SrvDef):
 class RosSetSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for Set"""
 
-    def __init__(self, model, search_field, raw):
+    def __init__(self, model: Type["RosModel"], selector_field, raw):
         self.model = model
-        self.search_field = search_field
         self.raw = raw
 
         self.name = f"Set{model.ros_msgtype if not raw else model.ros_rawmsgtype}"
+        self.selector_field = handle_ros_search(selector_field, model=model)
+        if self.selector_field["label"]:
+            self.name += f"By{self.selector_field["label"]}"
 
-        if not isinstance(self.search_field, tuple):
-            self.search_field = (self.search_field,)
-
-        if self.search_field[0] != "id":
-            self.name += f"By{self.search_field[0].capitalize()}"
+        for selector in self.selector_field["fields"]:
+            if "django_filter" in selector and "__" in selector["django_filter"]:
+                raise Exception("Selector does not support related fields")
 
         self.inputs = [
             {
@@ -122,22 +155,23 @@ class RosSetSrv(Ros2SrvDef):
 
         if "uuid" in [f.name for f in model._meta.get_fields()]:
             self.outputs.append(
-                {"type": model._meta.get_field("uuid").ros_type, "name": "uuid"}
+                {"type": model._meta.get_field("uuid").ros_type, "name": "uuid"}  # type: ignore
             )
 
     def cb(self, request, response):
         try:
             query = {
-                self.model._meta.get_field(field).name: getattr(
+                field["django_filter"]: getattr(
                     getattr(request, self.model.ros_data_field),
-                    self.model._meta.get_field(field).ros_name,
+                    self.model._meta.get_field(field["name"]).ros_name,  # type: ignore
                 )
-                for field in self.search_field
+                for field in self.selector_field["fields"]
+                if "django_filter" in field
             }
             obj = self.model.objects.get(**query)
         except ObjectDoesNotExist:
             if (
-                self.search_field[0] == "id"
+                self.selector_field["fields"][0]["name"] == "id"
                 and getattr(request, self.model.ros_data_field).id != -1
             ):
                 response.success = False
@@ -146,7 +180,7 @@ class RosSetSrv(Ros2SrvDef):
 
             obj = self.model()
 
-        if self.search_field[0] != "id":
+        if self.selector_field["fields"][0]["name"] != "id":
             # We force id to -1 to ignore it in the set
             getattr(request, self.model.ros_data_field).id = -1
 
@@ -156,22 +190,32 @@ class RosSetSrv(Ros2SrvDef):
 
         response.success = True
         response.message = ""
-        response.id = obj.id
+        response.id = obj.id  # type: ignore
         if "uuid" in [f.name for f in self.model._meta.get_fields()]:
-            response.uuid = obj.uuid
+            response.uuid = obj.uuid  # type: ignore
         return response
 
 
 class RosListSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for List"""
 
-    def __init__(self, model, filter_field, raw):
+    def __init__(self, model: Type["RosModel"], filter_field, raw):
         self.model = model
-        self.filter_field = filter_field
         self.raw = raw
 
         self.name = f"List{model.ros_msgtype if not raw else model.ros_rawmsgtype }"
-        self.inputs = [
+        if filter_field is not None:
+            self.filter_field = handle_ros_search(
+                search_field=filter_field, model=model
+            )
+            if self.filter_field["label"]:
+                self.name += f"By{self.filter_field["label"]}"
+
+            self.inputs = self.filter_field["fields"]
+        else:
+            self.filter_field = None
+            self.inputs = []
+        self.inputs.append(
             {
                 "type": "string[]",
                 "name": "fields",
@@ -180,15 +224,7 @@ class RosListSrv(Ros2SrvDef):
                     for field in model.msg_fields(raw)
                 ],
             }
-        ]
-
-        if self.filter_field:
-            self.filter_field = model._meta.get_field(self.filter_field)
-
-            self.name += f"By{self.filter_field.name.capitalize()}"
-            self.inputs.append(
-                {"type": self.filter_field.ros_type, "name": self.filter_field.ros_name}
-            )
+        )
 
         self.outputs = [
             {"type": "bool", "name": "success"},
@@ -204,7 +240,11 @@ class RosListSrv(Ros2SrvDef):
 
         if self.filter_field:
             objs = objs.filter(
-                **{self.filter_field.name: getattr(request, self.filter_field.ros_name)}
+                **{
+                    field["django_filter"]: getattr(request, field["name"])
+                    for field in self.filter_field["fields"]
+                    if "django_filter" in field
+                }
             )
 
         response.success = True
@@ -221,27 +261,16 @@ class RosListSrv(Ros2SrvDef):
 class RosDeleteSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for Delete"""
 
-    def __init__(self, model, search_field, raw):
+    def __init__(self, model: Type["RosModel"], search_field, raw):
         self.model = model
-        self.search_field = search_field
         self.raw = raw
 
         self.name = f"Delete{model.ros_msgtype if not raw else model.ros_rawmsgtype}"
+        self.search_field = handle_ros_search(search_field=search_field, model=model)
+        if self.search_field["label"]:
+            self.name += f"By{self.search_field["label"]}"
 
-        if not isinstance(self.search_field, tuple):
-            self.search_field = (self.search_field,)
-
-        if self.search_field[0] != "id":
-            self.name += f"By{self.search_field[0].capitalize()}"
-
-        self.inputs = [
-            {
-                "type": model._meta.get_field(field).ros_type,
-                "name": model._meta.get_field(field).ros_name,
-            }
-            for field in self.search_field
-        ]
-
+        self.inputs = self.search_field["fields"]
         self.outputs = [
             {"type": "bool", "name": "success"},
             {"type": "string", "name": "message"},
@@ -250,10 +279,9 @@ class RosDeleteSrv(Ros2SrvDef):
     def cb(self, request, response):
         try:
             query = {
-                self.model._meta.get_field(field).name: getattr(
-                    request, self.model._meta.get_field(field).ros_name
-                )
-                for field in self.search_field
+                field["django_filter"]: getattr(request, field["name"])
+                for field in self.search_field["fields"]
+                if "django_filter" in field
             }
             obj = self.model.objects.get(**query)
         except ObjectDoesNotExist:

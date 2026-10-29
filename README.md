@@ -197,7 +197,7 @@ In order to customize interface services, one can declare a `RosMeta` class insi
 
 Current accepted attributes are:
 
- - `ros_search`: list of fields (or fields tuple for and search) that we can search upon for `Get` and `Set` services.
+ - `ros_search`: list of fields (or fields tuple for additive search) that we can search upon for `Get` and `Delete` services.
    - Following example will generate a `GetFooByName` and `SetFooByName` service
     ```py
      class Foo(RosModel):
@@ -215,6 +215,7 @@ Current accepted attributes are:
     string message
     Foo  foo
     ```
+ - `ros_selector`: list of fields (or fields tuple for additive search) that will need to match for `Set` service.
  - `ros_filter`: list of fields to filter upon for `List` services
     - Following example will generate a `ListBarByFoo` to list all `Bar` that depends on a specific `Foo`
     ```py

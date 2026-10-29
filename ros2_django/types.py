@@ -14,6 +14,12 @@ class Ros2MsgFieldDef(TypedDict):
     enum: NotRequired[list[tuple[str, Any]]]
     default: NotRequired[Any]
     field: NotRequired[GenericField | RosComputedField]
+    django_filter: NotRequired[str]
+
+
+class RosSearchMeta(TypedDict):
+    label: str
+    fields: list[Ros2MsgFieldDef]
 
 
 class Ros2SrvDef(Protocol):
