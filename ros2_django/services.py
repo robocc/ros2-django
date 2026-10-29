@@ -192,13 +192,23 @@ class RosSetSrv(Ros2SrvDef):
 class RosListSrv(Ros2SrvDef):
     """Service definition (name, inputs, output and callback) for List"""
 
-    def __init__(self, model, filter_field, raw):
+    def __init__(self, model: Type["RosModel"], filter_field, raw):
         self.model = model
-        self.filter_field = filter_field
         self.raw = raw
 
         self.name = f"List{model.ros_msgtype if not raw else model.ros_rawmsgtype }"
-        self.inputs = [
+        if filter_field is not None:
+            self.filter_field = handle_ros_search(
+                search_field=filter_field, model=model
+            )
+            if self.filter_field["label"]:
+                self.name += f"By{self.filter_field["label"]}"
+
+            self.inputs = self.filter_field["fields"]
+        else:
+            self.filter_field = None
+            self.inputs = []
+        self.inputs.append(
             {
                 "type": "string[]",
                 "name": "fields",
@@ -207,15 +217,7 @@ class RosListSrv(Ros2SrvDef):
                     for field in model.msg_fields(raw)
                 ],
             }
-        ]
-
-        if self.filter_field:
-            self.filter_field = model._meta.get_field(self.filter_field)
-
-            self.name += f"By{self.filter_field.name.capitalize()}"
-            self.inputs.append(
-                {"type": self.filter_field.ros_type, "name": self.filter_field.ros_name}
-            )
+        )
 
         self.outputs = [
             {"type": "bool", "name": "success"},
@@ -231,7 +233,11 @@ class RosListSrv(Ros2SrvDef):
 
         if self.filter_field:
             objs = objs.filter(
-                **{self.filter_field.name: getattr(request, self.filter_field.ros_name)}
+                **{
+                    field["django_filter"]: getattr(request, field["name"])
+                    for field in self.filter_field["fields"]
+                    if "django_filter" in field
+                }
             )
 
         response.success = True
