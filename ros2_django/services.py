@@ -23,6 +23,8 @@ def handle_ros_search(
 
     if search_field[0] != "id":
         label = search_field[0].capitalize()
+        if "__" in label:
+            label = label.split("__")[-1].capitalize()
     else:
         label = ""
 

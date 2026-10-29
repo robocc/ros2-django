@@ -78,7 +78,7 @@ class RosModel(models.Model):
             # Set
             selector_fields = ["id"]
             if ros_meta:
-                search_fields += getattr(ros_meta, "ros_selector", [])
+                selector_fields += getattr(ros_meta, "ros_selector", [])
             for selector_field in selector_fields:
                 cls._services.append(RosSetSrv(cls, selector_field, raw))
 
